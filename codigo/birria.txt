@@ -1,5 +1,0 @@
-'''
-Observaciones
-*La longitud del grafo final es de 27671 la de la lista de origenes unicos es de 27661, por tanto
-habian 10 coordenadas que no estaban listadas al inicio y los cuales pueden fungir como origen
-'''

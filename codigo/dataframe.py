@@ -1,3 +1,4 @@
+'''
 import pandas as pd
 df = pd.read_csv(r'calles_de_medellin_con_acoso.csv', sep=";")
 deSara = {(6.2060586, -75.5687224): (37.34, 0.3021730539710254, 18.821086526985514), (6.2063043, -75.5681218): (63.401, 0.3021730539710254, 31.851586526985514), (6.2073652, -75.5685931): (108.671, 0.3021730539710254, 54.48658652698552), (6.2063061, -75.5715105): (334.387, 0.3021730539710254, 167.34458652698552)}
@@ -35,7 +36,6 @@ print(type(tupla1))
 lista = [(23,4)]
 print(tupla1 in lista)
 
-    '''
             if df['oneway'][index]:
                 graph[originIteration] = graph[originIteration] | {destinationIteration:(df['length'][index],df['harassmentRisk'][index])}
                 graph[destinationIteration] = graph[destinationIteration] | {originIteration:(df['length'][index],df['harassmentRisk'][index])}
@@ -45,5 +45,7 @@ print(tupla1 in lista)
                 graph[destinationIteration] = {}
                 graph[originIteration] = graph[originIteration] | {destinationIteration:(df['length'][index],df['harassmentRisk'][index])}
                 graph[destinationIteration] = graph[destinationIteration] | {originIteration:(df['length'][index],df['harassmentRisk'][index])}
-'''
+
     return graph
+
+'''

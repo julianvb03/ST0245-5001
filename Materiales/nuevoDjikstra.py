@@ -1,6 +1,7 @@
 #Importación de los modulos necesarios y lectura del archivo CSV
 import pandas as pd
 import gmplot
+from queue import PriorityQueue
 from geopy.geocoders import Nominatim
 
 df = pd.read_csv(r'calles_de_medellin_con_acoso.csv', sep=";")
@@ -46,12 +47,12 @@ def createGrahp() -> dict:
         originIteration = correctFormat(df['origin'][index])
         destinationIteration = correctFormat(df['destination'][index])
         if destinationIteration in graph:
-            if not df['oneway'][index]:
+            if df['oneway'][index]:
                 graph[originIteration] |= {destinationIteration:(df['length'][index],df['harassmentRisk'][index])}
                 graph[destinationIteration] |= {originIteration:(df['length'][index],df['harassmentRisk'][index])}
             else: graph[originIteration] |= {destinationIteration:(df['length'][index],df['harassmentRisk'][index])}
         else:
-            if  not df['oneway'][index]:
+            if df['oneway'][index]:
                 graph[destinationIteration] = {}
                 graph[originIteration] |= {destinationIteration:(df['length'][index],df['harassmentRisk'][index])}
                 graph[destinationIteration] |= {originIteration:(df['length'][index],df['harassmentRisk'][index])}
@@ -62,42 +63,46 @@ def createGrahp() -> dict:
 graphCM = createGrahp()
 
 #Algoritmo que busca la ruta más corta, retorna una lista en orden con los nodos que representan dicha ruta
-def DjikstraFirst(graph: dict, origin: tuple, destination: tuple) -> list:
-    shortesdDistance = {}
-    previusly = {}
-    noVisiteds = {vertex : float("inf") for vertex in graph}
-    shortestPath = []
+def Dijkstra(G, start, goal):
+    """ Uniform-cost search / dijkstra """
+    visited = set()
+    cost = {start: 0}
+    parent = {start: None}
+    todo = PriorityQueue()
 
-    while noVisiteds:
-        minDistance = None
-        for node in noVisiteds:
-            if minDistance is None:
-                minDistance = node
-            elif shortesdDistance[node] < shortesdDistance[minDistance]:
-                minDistance = node
+    todo.put((0, start))
+    while todo:
+        while not todo.empty():
+            _, vertex = todo.get()  # finds lowest cost vertex
+            # loop until we get a fresh vertex
+            if vertex not in visited: break
+        else:  # if todo ran out
+            break  # quit main loop
+        visited.add(vertex)
+        if vertex == goal:
+            break
+        for neighbor, distance in G[vertex]:
+            if neighbor in visited: continue  # skip these to save time
+            old_cost = cost.get(neighbor, float('inf'))  # default to infinity
+            new_cost = cost[vertex] + distance
+            if new_cost < old_cost:
+                todo.put((new_cost, neighbor))
+                cost[neighbor] = new_cost
+                parent[neighbor] = vertex
 
-        pahtOptions = graph[minDistance].items()
+    return parent
 
-        for childNode, weight in pahtOptions:
-            if weight[0] + shortesdDistance[minDistance] < shortesdDistance[childNode]:
-                shortesdDistance[childNode] = weight[0] + shortesdDistance[minDistance]
-                previusly[childNode] = minDistance
+def make_path(parent, goal):
+    if goal not in parent:
+        return None
+    v = goal
+    path = []
+    while v is not None:  # root has null parent
+        path.append(v)
+        v = parent[v]
+    return path[::-1]
 
-        noVisiteds.pop(minDistance)
-
-    actualyNode = destination
-
-    while actualyNode != origin:
-        try:
-            shortestPath.insert(0, actualyNode)
-            actualyNode = previusly[actualyNode]
-        except KeyError:
-            return ["Error"]
-
-    if shortesdDistance[destination] != CONTROLER:
-        return shortestPath
-
-route = DjikstraFirst(graphCM,(6.2099192, -75.5663399),(6.3003479,-75.5543665))
+route = Dijkstra(graphCM,(6.2099192, -75.5663399),(6.3003479,-75.5543665))
 
 #Genera un archivo HTML con la ruta visualmente
 def routhGenerator(lista: list) -> None:

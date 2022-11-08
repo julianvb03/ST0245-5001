@@ -1,62 +1,14 @@
 #Importación de los modulos necesarios, lectura del archivo CSV y Reemplazar los valores NaN en la columna de 'harassmentRisk'
-from math import radians, sin, cos, asin, sqrt
 from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
-from queue import PriorityQueue
 import folium
-import pandas as pd
 import random
-
-df = pd.read_csv(r'calles_de_medellin_con_acoso.csv', sep=";")
-HARASSMENT_APROX = df['harassmentRisk'].mean()
-df['harassmentRisk'].fillna(HARASSMENT_APROX, inplace=True)
-
-#Metodo para corregir las coordenadas
-def correctFormat(text: str) -> tuple:
-    textProcess = text[1:-1]
-    partB, partA = textProcess.split(",")
-    listReturn = [float(partA),float(partB)]
-    return tuple(listReturn)
-
-#Metodo para aplicar la formula de Haversine
-def haversine(latitude: float, longitude:float, latitude2: float, longitude2:float):
-    RADIO = 6371
-    lat1, lat2, lon1, lon2 = map(radians, [latitude, latitude2, longitude, longitude2])
-    operation = 2 * RADIO * asin(sqrt(pow(sin((lat2 -lat1)/2),2) + cos(lat1)*cos(lat2) * pow(sin((lon2 - lon1)/2),2) ))
-    return operation
 
 #Metodo para obtener el nombre de una calle con sus coordenadas
 def coordinateToStreet(coordinate: tuple) -> str:
     localizator = Nominatim(user_agent = "SecurityON")
     location = localizator.reverse("{},{}".format(coordinate[0],coordinate[1]))
     return str(location)
-
-#Metodo que crea el grafo
-def createGrahp() -> dict:
-    uniqueOrigins = pd.unique(df['origin'])
-    graph = {}
-    for origin in uniqueOrigins:
-        correctOrigin = correctFormat(origin)
-        graph[correctOrigin] = {}
-
-    for index in df.index:
-        originIteration = correctFormat(df['origin'][index])
-        destinationIteration = correctFormat(df['destination'][index])
-        if destinationIteration in graph:
-            if df['oneway'][index]:
-                graph[originIteration] |= {destinationIteration:(df['length'][index],df['harassmentRisk'][index],pow(df['length'][index], df['harassmentRisk'][index]))}
-                graph[destinationIteration] |= {originIteration:(df['length'][index],df['harassmentRisk'][index],pow(df['length'][index], df['harassmentRisk'][index]))}
-            else: graph[originIteration] |= {destinationIteration:(df['length'][index],df['harassmentRisk'][index],pow(df['length'][index], df['harassmentRisk'][index]))}
-        else:
-            if df['oneway'][index]:
-                graph[destinationIteration] = {}
-                graph[originIteration] |= {destinationIteration:(df['length'][index],df['harassmentRisk'][index],pow(df['length'][index], df['harassmentRisk'][index]))}
-                graph[destinationIteration] |= {originIteration:(df['length'][index],df['harassmentRisk'][index],pow(df['length'][index], df['harassmentRisk'][index]))}
-            else: graph[originIteration] |= {destinationIteration:(df['length'][index],df['harassmentRisk'][index],pow(df['length'][index], df['harassmentRisk'][index]))}
-
-    return graph
-
-graphCM = createGrahp()
 
 #Metodo para corregir el formato del tiempo
 def correct_time(n):
@@ -81,7 +33,7 @@ def correct_time(n):
     return(f'{nint} horas y {sobrante} minutos')
 
 #Metodo para generar el mapa con la ruta
-def create_map(path, path2, path3):
+def create_map(path, path2, path3, risk_rapida, risk_segura, risk_prom):
     mapa = folium.Map(location=[path[0][0], path[0][1]], zoom_start = 100) #, tiles='cartodbdark_matter'
 
     kilo1 = 0
@@ -190,64 +142,3 @@ def create_map(path, path2, path3):
     f3.add_to(mapa)
     folium.LayerControl().add_to(mapa)
     mapa.save('routes.html')
-
-#Metodo para encontrar la coordenada más cercana
-def aproximate_coord(coordenadas: tuple):
-    coords = list(graphCM.keys())[0]
-    distance = haversine(coordenadas[0],coordenadas[1],coords[0],coords[1])
-    for index in list(graphCM.keys()):
-        actual = haversine(coordenadas[0],coordenadas[1],index[0],index[1])
-        if distance > actual:
-            distance = actual
-            coords = index
-        else: continue
-    return coords
-
-#Algortitmo de busqueda
-def DjikstraTird(graph: dict, parameter: int, origin: tuple, destination: tuple) -> list:
-    distances = {vertex : [float("inf"),0] for vertex in graph}
-    previus = {vertex: 0 for vertex in graph}
-    compares = PriorityQueue()
-    global risk
-    harasment = 0
-    ruta = []
-
-    distances[origin] = [0,0]
-    compares.put((0,origin))
-
-    while not compares.empty():
-        vertexTuple = compares.get()
-        vertex = vertexTuple[1]
-        if vertex == destination: break
-        for adyacent in graph[vertex]:
-            weigth = graph[vertex][adyacent][parameter]
-            harasment = graph[vertex][adyacent][1]
-            if distances[adyacent][0] > distances[vertex][0] + weigth:
-                distances[adyacent][0] = distances[vertex][0] + weigth
-                distances[adyacent][1] = distances[vertex][1] + harasment
-                previus[adyacent] = vertex
-                compares.put((distances[adyacent],adyacent))
-
-    actual = destination
-    while actual != origin:
-        harasment += distances[actual]
-        ruta.insert(0,actual)
-        actual = previus[actual]
-    ruta.insert(0,origin)
-    harasment = distances[ruta[-2]][1]
-    risk = harasment / len(ruta)
-
-    return ruta
-
-
-starts = aproximate_coord((6.200200035354179, -75.57755148832867))
-target = aproximate_coord((6.26202374889627, -75.57729130409341))
-
-rapida = DjikstraTird(graphCM,0,starts, target)
-risk_rapida = risk
-segura = DjikstraTird(graphCM,2,starts, target)
-risk_segura = risk
-prom = DjikstraTird(graphCM,1,starts, target)
-risk_prom = risk
-
-create_map(rapida, segura, prom)
